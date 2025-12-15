@@ -47,7 +47,7 @@ async function run() {
 
     // GET -- getting all servies data
     app.get("/services", async (req, res) => {
-      const cursor = servicesColl.find();
+      const cursor = servicesColl.find().sort({ createdAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -55,6 +55,7 @@ async function run() {
     //  POST -- creating a servies
     app.post("/services", async (req, res) => {
       const servicesData = req.body;
+      servicesData.createdAt = new Date();
       const result = await servicesColl.insertOne(servicesData);
       res.send(result);
     });
