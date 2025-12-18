@@ -294,6 +294,13 @@ async function run() {
 
     // USER RELATED APIS
 
+    app.get("/users/:email/role", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await userColl.findOne(query);
+      res.send({ role: result?.role || "user" });
+    });
+
     app.get("/users", async (req, res) => {
       const searchText = req.query.searchText;
       const query = {};
