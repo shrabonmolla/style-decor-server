@@ -36,6 +36,7 @@ async function run() {
     const bookingsColl = db.collection("bookings");
     const paymentsColl = db.collection("payments");
     const userColl = db.collection("users");
+    const decoratorsColl = db.collection("decorators");
 
     // services related apis
 
@@ -208,6 +209,53 @@ async function run() {
       }
 
       const result = await userColl.insertOne(user);
+      res.send(result);
+    });
+
+    // RIDERS RELATAED API
+
+    app.get("/decorators", async (req, res) => {
+      const query = {};
+      if (req.query.status) {
+        query.status = req.query.status;
+      }
+      const cursor = decoratorsColl.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.post("/decorators", async (req, res) => {
+      const decorator = req.body;
+      decorator.status = "pending";
+      decorator.createdAt = new Date();
+
+      const result = await decoratorsColl.insertOne(decorator);
+      res.send(result);
+    });
+
+    app.patch("/decorators/:id", async (req, res) => {
+      const status = req.body.status;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: status,
+        },
+      };
+
+      const result = await decoratorsColl.updateOne(query, updatedDoc);
+
+      if (status === "approved") {
+        const email = req.body.email;
+        const userQuery = { email };
+        const updateUser = {
+          $set: {
+            role: "decorator",
+          },
+        };
+        const userResult = await userColl.updateOne(userQuery, updateUser);
+      }
+
       res.send(result);
     });
 
