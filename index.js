@@ -195,6 +195,25 @@ async function run() {
     });
 
     // USER RELATED APIS
+
+    app.get("/users", async (req, res) => {
+      const searchText = req.query.searchText;
+      const query = {};
+
+      if (searchText) {
+        // query.displayName = {$regex: searchText, $options: 'i'}
+
+        query.$or = [
+          { displayName: { $regex: searchText, $options: "i" } },
+          { email: { $regex: searchText, $options: "i" } },
+        ];
+      }
+
+      const cursor = userColl.find(query).sort({ createdAt: -1 }).limit(5);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     // saving user in the db
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -209,6 +228,19 @@ async function run() {
       }
 
       const result = await userColl.insertOne(user);
+      res.send(result);
+    });
+
+    app.patch("/users/:id/role", async (req, res) => {
+      const id = req.params.id;
+      const roleInfo = req.body;
+      const query = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: roleInfo.role,
+        },
+      };
+      const result = await userColl.updateOne(query, updatedDoc);
       res.send(result);
     });
 
