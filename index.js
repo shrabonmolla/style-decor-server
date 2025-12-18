@@ -35,6 +35,7 @@ async function run() {
     const servicesColl = db.collection("services");
     const bookingsColl = db.collection("bookings");
     const paymentsColl = db.collection("payments");
+    const userColl = db.collection("users");
 
     // services related apis
 
@@ -190,6 +191,24 @@ async function run() {
           paymentInfo: paymentResult,
         });
       }
+    });
+
+    // USER RELATED APIS
+    // saving user in the db
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      user.role = "user";
+      user.createdAt = new Date();
+
+      const email = user.email;
+      const userExists = await userColl.findOne({ email });
+
+      if (userExists) {
+        return res.send({ message: "user exists" });
+      }
+
+      const result = await userColl.insertOne(user);
+      res.send(result);
     });
 
     await client.db("admin").command({ ping: 1 });
