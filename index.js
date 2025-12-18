@@ -58,6 +58,7 @@ async function run() {
     //  POST -- creating a servies
     app.post("/services", async (req, res) => {
       const servicesData = req.body;
+
       servicesData.createdAt = new Date();
       const result = await servicesColl.insertOne(servicesData);
       res.send(result);
@@ -92,9 +93,73 @@ async function run() {
     // bookings services related apis
 
     // GET-- getting bookings data
+
+    app.get("/mybookings", async (req, res) => {
+      const cursor = bookingsColl.find({ email: req.query.email });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get("/bookings/decorators", async (req, res) => {
+      const { decoratorEmail, deliveryStatus } = req.query;
+      const query = {};
+
+      if (decoratorEmail) {
+        query.decoratorEmail = decoratorEmail;
+      }
+      if (deliveryStatus !== "completed") {
+        // query.deliveryStatus = {$in: ['driver_assigned', 'rider_arriving']}
+        query.deliveryStatus = { $nin: ["completed"] };
+      } else {
+        query.deliveryStatus = deliveryStatus;
+      }
+
+      const cursor = bookingsColl.find(query);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.patch("/bookings/:id/status", async (req, res) => {
+      const { deliveryStatus, decoratorId } = req.body;
+
+      const query = { _id: new ObjectId(req.params.id) };
+      const updatedDoc = {
+        $set: {
+          deliveryStatus: deliveryStatus,
+        },
+      };
+
+      if (deliveryStatus === "completed") {
+        // update rider information
+        const decoratorQuery = { _id: new ObjectId(decoratorId) };
+        const decoratorUpdatedDoc = {
+          $set: {
+            workStatus: "available",
+          },
+        };
+        const decoratorResult = await decoratorsColl.updateOne(
+          decoratorQuery,
+          decoratorUpdatedDoc
+        );
+      }
+
+      const result = await bookingsColl.updateOne(query, updatedDoc);
+
+      res.send(result);
+    });
+
     app.get("/bookings", async (req, res) => {
-      const email = req.query.email;
-      const cursor = bookingsColl.find({ email: email });
+      const query = {};
+      const { email, deliveryStatus } = req.query;
+
+      if (email) {
+        query.senderEmail = email;
+      }
+
+      if (deliveryStatus) {
+        query.deliveryStatus = deliveryStatus;
+      }
+      const cursor = bookingsColl.find(query);
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -104,6 +169,38 @@ async function run() {
       const bookingsData = req.body;
       const result = await bookingsColl.insertOne(bookingsData);
       res.send(result);
+    });
+
+    // updating service info and decorator info after assiging decorator
+    app.patch("/bookings/:id", async (req, res) => {
+      const { decoratorId, decoratorName, decoratorEmail } = req.body;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const updatedDoc = {
+        $set: {
+          deliveryStatus: "decorator_assigned",
+          decoratorId: decoratorId,
+          decoratorName: decoratorName,
+          decoratorEmail: decoratorEmail,
+        },
+      };
+
+      const result = await bookingsColl.updateOne(query, updatedDoc);
+
+      // update rider information
+      const riderQuery = { _id: new ObjectId(decoratorId) };
+      const riderUpdatedDoc = {
+        $set: {
+          workStatus: "in_delivery",
+        },
+      };
+      const riderResult = await decoratorsColl.updateOne(
+        riderQuery,
+        riderUpdatedDoc
+      );
+
+      res.send(riderResult);
     });
 
     // Payments  related apis
@@ -170,6 +267,7 @@ async function run() {
         const update = {
           $set: {
             paymentStatus: session.payment_status,
+            deliveryStatus: "pending-pickup",
           },
         };
         const result = await bookingsColl.updateOne(query, update);
@@ -247,9 +345,15 @@ async function run() {
     // RIDERS RELATAED API
 
     app.get("/decorators", async (req, res) => {
+      const { status, workStatus } = req.query;
       const query = {};
-      if (req.query.status) {
-        query.status = req.query.status;
+
+      if (status) {
+        query.status = status;
+      }
+
+      if (workStatus) {
+        query.workStatus = workStatus;
       }
       const cursor = decoratorsColl.find(query);
       const result = await cursor.toArray();
@@ -272,6 +376,7 @@ async function run() {
       const updatedDoc = {
         $set: {
           status: status,
+          workStatus: "available",
         },
       };
 
