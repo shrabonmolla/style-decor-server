@@ -34,6 +34,7 @@ async function run() {
     const db = client.db("StyleDecor");
     const servicesColl = db.collection("services");
     const bookingsColl = db.collection("bookings");
+    const paymentsColl = db.collection("payments");
 
     // services related apis
 
@@ -106,9 +107,23 @@ async function run() {
     // Payments  related apis
 
     // getting payment link
+
+    app.get("/payments", async (req, res) => {
+      const email = req.query.email;
+      const query = {};
+
+      if (email) {
+        query.customerEmail = email;
+      }
+
+      const cursor = paymentsColl.find(query).sort({ paidAt: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
-      const amount = parseInt(paymentInfo.serviceCost);
+      const amount = parseInt(paymentInfo.serviceCost) * 100;
       const session = await stripe.checkout.sessions.create({
         line_items: [
           {
@@ -125,6 +140,7 @@ async function run() {
         ],
         mode: "payment",
         metadata: {
+          serviceName: paymentInfo.serviceName,
           serviceId: paymentInfo.serviceId,
           customerName: paymentInfo.customerName,
         },
@@ -139,7 +155,13 @@ async function run() {
     app.patch("/payment-success", async (req, res) => {
       const sessionId = req.query.sessionId;
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log(session);
+      const transactionId = session.payment_intent;
+      const query = { transactionId: transactionId };
+      const paymentExist = await paymentsColl.findOne(query);
+      if (paymentExist) {
+        return res.send({ messsage: "payment already exist" });
+      }
+      // console.log(session);
       if (session.payment_status === "paid") {
         const id = session.metadata.serviceId;
         const query = { _id: new ObjectId(id) };
@@ -149,7 +171,24 @@ async function run() {
           },
         };
         const result = await bookingsColl.updateOne(query, update);
-        res.send(result);
+
+        const payment = {
+          serviceName: session.metadata.serviceName,
+          serviceId: session.metadata.serviceId,
+          customerName: session.metadata.customerName,
+          customerEmail: session.customer_email,
+          amount: session.amount_total / 100,
+          transactionId: session.payment_intent,
+          paymentStatus: session.payment_status,
+          paidAt: new Date(),
+        };
+
+        const paymentResult = await paymentsColl.insertOne(payment);
+
+        res.send({
+          updatedBookingInfo: result,
+          paymentInfo: paymentResult,
+        });
       }
     });
 
