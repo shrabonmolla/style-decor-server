@@ -119,6 +119,29 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/mybookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const { serviceName, name, email, date, location } = req.body;
+      const updatdDoc = {
+        $set: {
+          serviceName,
+          name,
+          email,
+          date,
+          location,
+        },
+      };
+      const result = await bookingsColl.updateOne(query, updatdDoc);
+      res.send(result);
+    });
+
+    app.delete("/mybookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await bookingsColl.deleteOne({ _id: new ObjectId(id) });
+      res.send(result)
+    });
+
     app.patch("/bookings/:id/status", async (req, res) => {
       const { deliveryStatus, decoratorId } = req.body;
 
